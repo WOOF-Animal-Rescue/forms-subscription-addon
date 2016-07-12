@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <!-- The CSS package above applies Google styling to buttons and other elements. -->
+
+    <style>
+    .branding-below {
+      bottom: 54px;
+      top: 0;
+    }
+    
+    .branding-text {
+      left: 7px;
+      position: relative;
+      top: 3px;
+    }
+    
+    .logo {
+      vertical-align: middle;
+    }
+    
+    .width-100 {
+      width: 100%;
+      box-sizing: border-box;
+      -webkit-box-sizing : border-box;‌
+      -moz-box-sizing : border-box;
+    }
+    
+    label {
+      font-weight: bold;
+    }
+    
+    #subscription-options {
+      background-color: #eee;
+      border-color: #eee;
+      border-width: 5px;
+      border-style: solid;
+      display: none;
+    }
+    
+    #respondent-email,
+    #respondent-consent,
+    #group-email,
+    #button-bar {
+      margin-bottom: 10px;
+    }
+    
+    </style>
+  </head>
+  <body>
+    <div class="sidebar branding-below">
+      <form>
+        <div class="block">
+          <input type="checkbox" id="subscribeUserToMailingList">
+          <label for="subscribeUserToMailingList">Subscribe Respondents to Mailing List</label>
+        </div>
+        <div class="block form-group" id="subscription-options">
+          <label for="respondent-email">
+            Which question asks for their email?
+          </label>
+          <select class="width-100" id="respondent-email"></select>
+          <label for="respondent-consent">
+            Which question asks for their consent to be subscribed to a mailing list?
+          </label>
+          <select class="width-100" id="respondent-consent"></select>
+          <label for="group-email">What group e-mail address should the respondent be subscribed to?</label>
+          <input type="text" class="width-100" id="group-email">
+        </div>
+    
+        <div class="block" id="button-bar">
+          <button class="action" id="save-settings">Save</button>
+        </div>
+      </form>
+    </div>
+    
+    <div class="sidebar bottom">
+      <img alt="Add-on logo" class="logo" width="25"
+          src="https://googledrive.com/host/0B0G1UdyJGrY6XzdjQWF4a1JYY1k/form-notifications-logo-small.png">
+      <span class="gray branding-text">Subscribe User to a Mailing List</span>
+    </div>
+    
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js">
+    </script>
+    <script>
+      /**
+       * On document load, assign required handlers to each element,
+       * and attempt to load any saved settings.
+       */
+      $(function() {
+        $('#save-settings').click(saveSettingsToServer);
+        $('#subscribeUserToMailingList').click(toggleSubscribeUserToMailingList);
+        google.script.run
+           .withSuccessHandler(loadSettings)
+           .withFailureHandler(showStatus)
+           .withUserObject($('#button-bar').get())
+           .getSettings();
+      });
+    
+      /**
+       * Callback function that populates the subscription options using
+       * previously saved values.
+       *
+       * @param {Object} settings The saved settings from the client.
+       */
+      function loadSettings(settings) {
+    
+        if (settings.subscribeUserToMailingList == 'true') {
+          $('#subscribeUserToMailingList').prop('checked', true);
+          $('#subscription-options').show();
+        }
+        
+        $('#group-email').val(settings.groupEmail);
+    
+        // Fill the respondent email select box with the
+        // titles given to the form's text Items. Also include
+        // the form Item IDs as values so that they can be
+        // easily recovered during the Save operation.
+        for (var i = 0; i < settings.textItems.length; i++) {
+          var option = $('<option>').attr('value', settings.textItems[i]['id'])
+              .text(settings.textItems[i]['title']);
+          $('#respondent-email').append(option);
+        }
+        $('#respondent-email').val(settings.respondentEmailItemId);
+        
+        // Fill the respondent consent select box with the 
+        // titles given to the form's multiple choice items Also include
+        // the form Item Ids as values so they can be
+        // easily recovered during the Save operation
+        for (var i = 0; i < settings.choiceItems.length; i++) {
+           var option = $('<option>').attr('value', settings.choiceItems[i]['id'])
+               .text(settings.choiceItems[i]['title']);
+           $('#respondent-consent').append(option);
+        }
+        $('#respondent-consent').val(settings.respondentConsentItemId); 
+      }
+    
+      /**
+       * Toggles the visibility of the form sumbitter notification options.
+       */
+      function toggleSubscribeUserToMailingList() {
+        $('#status').remove();
+        if($('#subscribeUserToMailingList').is(':checked')) {
+          $('#subscription-options').show();
+        } else {
+          $('#subscription-options').hide();
+        }
+      }
+    
+      /**
+       * Collects the options specified in the add-on sidebar and sends them to
+       * be saved as Properties on the server.
+       */
+      function saveSettingsToServer() {
+        this.disabled = true;
+        $('#status').remove();
+        var subscribeUserToMailingList = $('#subscribeUserToMailingList').is(':checked');
+        var settings = {
+          'subscribeUserToMailingList': subscribeUserToMailingList
+        };
+    
+        // Only save respondent options if subscribe is turned on
+        if (subscribeUserToMailingList) {
+          settings.respondentEmailItemId = $('#respondent-email').val();
+          settings.respondentConsentItemId = $('#respondent-consent').val();
+          settings.groupEmail = $('#group-email').val();
+        }
+    
+        // Save the settings on the server
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+                showStatus('Saved settings', $('#button-bar'));
+                element.disabled = false;
+              })
+            .withFailureHandler(
+              function(msg, element) {
+                showStatus(msg, $('#button-bar'));
+                element.disabled = false;
+              })
+            .withUserObject(this)
+            .saveSettings(settings);
+      }
+    
+      /**
+       * Inserts a div that contains an status message after a given element.
+       *
+       * @param {String} msg The status message to display.
+       * @param {Object} element The element after which to display the Status.
+       */
+      function showStatus(msg, element) {
+         var div = $('<div>')
+             .attr('id', 'status')
+             .attr('class','error')
+             .text(msg);
+        $(element).after(div);
+      }
+    </script>
+  </body>
+</html>
+
